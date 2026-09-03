@@ -125,6 +125,29 @@ def split_dataset(config: Config) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
     return train_df, val_df, test_df
 
 
+def _cap_per_class(df: pd.DataFrame, subset_per_class: int, random_state: int) -> pd.DataFrame:
+    """Cap each class to at most `subset_per_class` rows.
+
+    Implemented as an explicit loop + pd.concat rather than
+    groupby(...).apply(...), since apply's handling of the grouping
+    column is inconsistent across pandas versions and can silently drop
+    "label_idx" from the result — this version is unambiguous.
+
+    Args:
+        df: DataFrame with a "label_idx" column.
+        subset_per_class: Max rows to keep per label_idx value.
+        random_state: Seed for reproducible sampling.
+
+    Returns:
+        A new DataFrame, capped per class, with all original columns intact.
+    """
+    parts = []
+    for _, group in df.groupby("label_idx"):
+        n = min(len(group), subset_per_class)
+        parts.append(group.sample(n=n, random_state=random_state))
+    return pd.concat(parts, ignore_index=True)
+
+
 def get_dataloaders(
     config: Config, subset_per_class: int = None
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
@@ -143,10 +166,7 @@ def get_dataloaders(
     train_df, val_df, test_df = split_dataset(config)
 
     if subset_per_class is not None:
-        train_df = (
-            train_df.groupby("label_idx", group_keys=False)
-            .apply(lambda g: g.sample(n=min(len(g), subset_per_class), random_state=config.random_state))
-        )
+        train_df = _cap_per_class(train_df, subset_per_class, config.random_state)
 
     train_ds = CropDiseaseDataset(train_df, get_transforms(train=True, image_size=config.image_size))
     val_ds = CropDiseaseDataset(val_df, get_transforms(train=False, image_size=config.image_size))
