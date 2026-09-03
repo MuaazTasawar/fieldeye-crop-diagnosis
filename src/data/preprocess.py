@@ -9,6 +9,7 @@ numbers reflect real generalization, not augmented luck.
 """
 
 import os
+import sys
 from typing import Tuple
 
 import pandas as pd
@@ -17,6 +18,8 @@ from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+
+sys.path.insert(0, os.getcwd())
 
 from src.config import Config
 from src.data.load_data import load_image_dataframe
